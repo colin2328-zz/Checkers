@@ -1,0 +1,52 @@
+#navigation{
+	width:140px
+}
+
+
+#navigation table{
+	width:100%
+}
+
+#navigation input{
+
+	width:100%
+}
+
+#content{
+	background-color:gray;
+
+}
+#firstLevel{
+	width: 400px;
+	height: 400px;
+	z-index: 0;
+}
+
+#secondLevel {
+	position: absolute;
+	width: 400px;
+	height: 400px;
+	top:11px;
+	left: 155px;
+	z-index: 1;
+
+	}
+#thirdLevel{
+	position: absolute;
+	top:11px;
+	left: 155px;
+	width: 400px;
+	height: 400px;
+	z-index: 2;
+}
+
+.Turn{
+	background-color:black;
+	color:white;
+	text-align: center;
+	
+}
+.checker{
+	width:100%;
+	height:100%;
+}

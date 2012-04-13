@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+
+<!--
+  COLLABORATORS: None
+  
+-->
+<html>
+
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<title>Checkerboard</title>
+
+<!-- Load style sheets -->
+<link rel="stylesheet" type="text/css" href="mainLayout.css" />
+
+<!-- Load any supplemental Javascript libraries here -->
+<!-- <script type="text/javascript" src="jquery/js/jquery-1.7.1.min.js"></script> -->
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/jquery-ui.min.js"></script>
+
+<script type="text/javascript" src="checker.js"></script>
+<script type="text/javascript" src="boardEvent.js"></script>
+<script type="text/javascript" src="board.js"></script>
+<script type="text/javascript" src="rules.js"></script>
+
+<script type="text/javascript">
+
+//This script extracts parameters from the URL
+//from jquery-howto.blogspot.com
+
+    $.extend({
+        getUrlVars : function() {
+            var vars = [], hash;
+            var hashes = window.location.href.slice(
+                    window.location.href.indexOf('?') + 1).split('&');
+            for ( var i = 0; i < hashes.length; i++) {
+                hash = hashes[i].split('=');
+                vars.push(hash[0]);
+                vars[hash[0]] = hash[1];
+            }
+            return vars;
+        },
+        getUrlVar : function(name) {
+            return $.getUrlVars()[name];
+        }
+    });
+
+    var DEFAULT_BOARD_SIZE = 8;
+
+    //data model
+    var board;
+    var rules;
+    var whoseTurn = "black";	
+
+    var directionOf = function(color) {
+      if (color == "black") {
+        return -1;
+      }
+      return 1;
+    }
+
+    // Fill in this function to toggle the display for whose turn
+    // The color parameter should be either "black" or "red"
+    var toggleTurn = function(color) {
+
+    	if (whoseTurn == "black"){
+    		whoseTurn = "red";
+    		$("#whoseTurn").html("Red");
+    		$(".Turn").css('background-color', 'red');
+    	} else {
+    		whoseTurn = "black";
+    		$("#whoseTurn").html("Black");
+    		$(".Turn").css('background-color', 'black');
+    	}	
+    }
+    
+    
+    
+
+    // This allows the Javascript code inside this block to only run when the page
+    // has finished loading in the browser.
+    $(document).ready(function() {
+
+        if ($.getUrlVar('size') && $.getUrlVar('size') >= 6) {
+            board = new Board($.getUrlVar('size'));
+        } else {
+            board = new Board(DEFAULT_BOARD_SIZE);
+        }
+		rules = new Rules(board);
+
+		
+		undoRamArray = new Array();
+        redoRamArray = new Array();
+     	// Your code here
+		if (undoRamArray.length == 0){
+    		$('#btnUndo').attr('disabled','disabled');
+    	}
+    	if (redoRamArray.length == 0){
+    		$('#btnRedo').attr('disabled','disabled');
+    	}
+
+     	
+
+     	$("#whoseTurn").html("Black");
+     	
+     	var canvas = document.getElementById('board');  
+     	if (canvas.getContext){  
+     		  var ctx = canvas.getContext('2d'); 
+     		  var thirdLevelCtx = $('#arrows')[0].getContext("2d");
+     		  // drawing code here  
+     		  var size = board.size();
+     		  length = 400/size;
+     		  ctx.fillStyle = "white";
+     		 for (var i = 0; i < size/2; i++){// for each rows
+     			 for (var j = 0; j < size /2; j++){//for each col
+     				 ctx.fillRect(i*length*2, j*length*2, length, length);
+     			 }     			 
+     		 }
+     		for (var i = 0; i < size/2; i++){// for each rows
+    			 for (var j = 0; j < size /2; j++){//for each col
+    				 ctx.fillRect(i*length*2+length, j*length*2+length, length, length);
+    			 }     			 
+    		 }
+     		
+     		ctx.beginPath();
+     		ctx.moveTo(0,0);
+     		ctx.lineTo(0, 400);
+     		ctx.lineTo(400, 400);
+     		ctx.lineTo(400, 0);
+     		ctx.lineTo(0,0);
+     		ctx.stroke();		
+    		} else {  
+     		  // canvas-unsupported code here  
+     		}
+     	
+     	function addCheckerToBoard(row, col, isKing, color){
+     		
+     		var checker_div = $('<div></div>');
+        	checker_div.css('height', length);
+        	checker_div.css('width', length);
+        	checker_div.css('left', col*length);
+        	checker_div.css('top', row* length);
+        	checker_div.css('position', 'absolute');
+        	checker_div.attr('id', row + 'C' + col);        	
+        	
+        	if (color == 'red'){
+        		if (isKing) {
+        			var img = "<img class= checker src= graphics/red-king.png>";
+        		} else {
+        			var img = "<img class= checker src= graphics/red-piece.png>";
+        		}
+        	}else {
+        		if (isKing) {
+        			var img = "<img class= checker src= graphics/black-king.png>";
+        		} else {
+        			var img = "<img class= checker src= graphics/black-piece.png>";
+        		}
+        	}
+        	checker_div.html(img);	
+        	
+        	
+        	$("#secondLevel").append(checker_div);
+        	
+     		
+     	}
+     	
+     	function removeCheckerFromBoard(row, col){
+     		var id = row + 'C' + col;
+     		$('#' + id).remove();
+     	}
+     	
+     	function drawArrow(fromRow,fromCol,toRow,toCol){
+     	    var x1 = fromCol*length + length/2;
+     	    var y1 = fromRow*length + length/2;
+     	    var x2 = toCol*length + length/2;
+     	    var y2 = toRow*length + length/2;
+     	   	var triLength = 15; 
+     	  	var angle = Math.atan2(y2-y1,x2-x1);
+     	  	
+     	    var tx1 = x2-triLength*Math.cos(angle-Math.PI/5);// triangle x1
+     	    var ty1 = y2-triLength*Math.sin(angle-Math.PI/5);
+     	    var tx2 = x2-triLength*Math.cos(angle+Math.PI/5);
+     	    var ty2 = y2-triLength*Math.sin(angle+Math.PI/5);
+     	    
+     	   	thirdLevelCtx.strokeStyle = 'yellow';
+
+     	    thirdLevelCtx.beginPath();
+     	    thirdLevelCtx.lineWidth = 3;
+     	    
+     	    thirdLevelCtx.moveTo(x1, y1);
+     	    thirdLevelCtx.lineTo(x2, y2);
+     	  
+     	    thirdLevelCtx.moveTo(x2, y2);
+     	    thirdLevelCtx.lineTo(tx1, ty1);
+     	    thirdLevelCtx.lineTo(tx2,ty2);
+     	    thirdLevelCtx.lineTo(x2, y2);
+     	   thirdLevelCtx.fillStyle = 'yellow';
+     	    thirdLevelCtx.fill();
+     	   thirdLevelCtx.stroke();
+     	    
+     	  }
+     	
+     	function resetArrows(){
+     		var canvas = $('#arrows')[0]; 
+     		var wid = canvas.width;//learned this trick online
+     		canvas.width = wid -1;
+     		canvas.width = wid;
+     	}
+     	
+        board.addEventListener('add',function (e) {
+        	var row = e.details.checker.row;
+        	var col = e.details.checker.col;
+        	var isKing = e.details.checker.isKing;
+        	var color = e.details.checker.color;        	
+        	addCheckerToBoard(row, col, isKing, color);
+        	
+    	},true);
+
+    	board.addEventListener('move',function (e) {
+    		resetArrows();
+        	var fromCol = e.details.fromCol;
+        	var fromRow = e.details.fromRow;
+        	var toCol = e.details.toCol;
+        	var toRow = e.details.toRow;
+        	var isKing = e.details.checker.isKing;
+        	var color = e.details.checker.color;
+        	
+        	removeCheckerFromBoard(fromRow, fromCol);
+        	addCheckerToBoard(toRow, toCol, isKing, color);
+        	drawArrow(fromRow, fromCol, toRow, toCol);
+        	
+    	},true);
+
+        board.addEventListener('remove', function(e) {
+        	var row = e.details.row;
+        	var col = e.details.col;
+        	removeCheckerFromBoard(row, col);
+        }, true);
+
+        board.addEventListener('promote',function (e) {
+        	var row = e.details.checker.row;
+        	var col = e.details.checker.col;
+        	var color = e.details.checker.color;
+        	
+        	removeCheckerFromBoard(row,col);
+        	addCheckerToBoard(row, col, 'true', color);
+        	    	},true);
+
+        
+        $("#btnNewGame").click(function(evt) {
+        	resetArrows();
+        	$("#whoseTurn").html("Black");
+        	whoseTurn = "black";
+        	$(".Turn").css('background-color', 'black');
+        	$("#secondLevel").empty();
+        	redoRamArray= new Array();
+        	undoRamArray = new Array();
+        	if (undoRamArray.length == 0){
+        		$('#btnUndo').attr('disabled','disabled');
+        	}
+        	if (redoRamArray.length == 0){
+        		$('#btnRedo').attr('disabled','disabled');
+        	}
+            board.prepareNewGame();
+        });
+        
+
+
+        $("#btnAutoMove").click(function(evt) {
+			doCompPlayer();
+			doCompPlayer();
+          
+        });
+        $("#btnUndo").click(function(evt) {
+			undoMove();
+			
+			toggleTurn();
+            
+          });
+        
+        $("#btnRedo").click(function(evt){
+        	redoMove();
+        	toggleTurn();
+        	
+        });
+        
+        function undoMove(){
+        	var toDo = undoRamArray.pop();
+        	if (toDo!=null){
+
+        		processUndoRam(toDo);
+        	}
+        	if (undoRamArray.length == 0){
+        		$('#btnUndo').attr('disabled', 'disabled');
+	
+        	}
+        	
+        	
+        }
+        function processUndoRam(todo){
+        	var checker = board.getCheckerAt(todo.to_row, todo.to_col);
+        	board.moveTo(checker, todo.from_row, todo.from_col);
+        	if (todo.made_king == true){
+        		board.remove(checker);
+        		var new_checker = new Checker(checker.color, false);
+        		board.add(new_checker, todo.from_row, todo.from_col);
+        	}
+        	
+        	var removeList = todo.remove;
+        	for (var i = 0; i < removeList.length; i++){        		
+        		var checker_attr = removeList[i];
+        		var new_checker = new Checker(checker_attr.color, checker_attr.isKing);
+        		board.add(new_checker, checker_attr.row, checker_attr.col);
+        	}
+        	redoRamArray.push(todo);
+        	$('#btnRedo').removeAttr('disabled');
+        	
+        }
+        function redoMove(){
+        	var toDo = redoRamArray.pop();
+        	if (toDo!=null){
+        		processRedoRam(toDo);
+        	}
+        	if (redoRamArray.length == 0){
+        		$('#btnRedo').attr('disabled', 'disabled');
+	
+        	}
+        }
+        
+        function processRedoRam(todo){
+        	var checker = board.getCheckerAt(todo.from_row, todo.from_col);
+        	
+        	board.moveTo(checker, todo.to_row, todo.to_col)
+        	var removeList = todo.remove;
+        	for (var i = 0; i < removeList.length; i++){        		
+        		var checker_attr = removeList[i];
+        		var new_checker = board.getCheckerAt(checker_attr.row, checker_attr.col);
+        		board.remove(new_checker);
+        	}
+        	
+        	undoRamArray.push(todo);
+        	$('#btnUndo').removeAttr('disabled');
+        }
+        
+        
+        
+        board.prepareNewGame();
+        
+        function doCompPlayer(){
+        	var playerColor = whoseTurn;
+            var playerDirection = directionOf(playerColor);
+           
+            var result = rules.makeRandomMove(playerColor, playerDirection);
+			redoRamArray = new Array();
+			undoRamArray.push(result);
+			$('#btnUndo').removeAttr('disabled');
+			$('#btnRedo').attr('disabled', 'disabled');
+            
+        
+            
+            if (result != null) {
+              toggleTurn();
+            } else{//victory!
+            	toggleTurn();
+            	alert("VICTORY to "+ whoseTurn);
+            }
+        	
+        }
+        
+        
+        $(document).mousedown(function(eventData) {
+
+        	
+        	var mousex = eventData.pageX - $('#secondLevel').offset().left;
+        	var mousey = eventData.pageY - $('#secondLevel').offset().top;
+        
+        	if (mousex > 0 && mousex < canvas.width && mousey > 0 && mousey < canvas.height) {   
+         	var row = Math.floor(mousey / length);
+         	var col = Math.floor(mousex / length);
+         	var id = "#" + row + "C" + col;
+         	clickedChecker = $(id);
+         	dragData = new Array();
+         	dragData.setter = false;
+         	if (board.getCheckerAt(row, col)!= null){
+         		var checker = board.getCheckerAt(row, col);
+         	
+	         	dragData.setter = true;
+	            dragData.clickedChecker = clickedChecker;
+	            dragData.row = row;
+	            dragData.col = col;
+	            dragData.isKing = checker.isKing;
+	            dragData.color = checker.color;
+	            dragData.xOffset = $('#secondLevel').offset().left;
+	            dragData.yOffset = $('#secondLevel').offset().top;
+	            dragData.oldX = clickedChecker.css('left');
+	            dragData.oldY = clickedChecker.css('top');
+	            dragData.originalZ = clickedChecker.css('z-index');
+	            //console.log("xOffset" + dragData.xOffset + "  yOffset" + dragData.yOffset);
+	            clickedChecker.css('z-index', 500);
+	         	}
+            
+            $(document).mousemove(function(eventData) {
+            	
+            	if (dragData.setter) {            		
+            	toX = eventData.pageX - dragData.xOffset - length/2;
+            	toY = eventData.pageY - dragData.yOffset- length/2;
+            	dragData.clickedChecker.css({left: toX, top: toY});
+            	}
+            });
+            
+            $(document).mouseup(function(eventData){
+            	if (dragData.setter){
+	            	//get row
+	            	var mousex = eventData.pageX - $('#secondLevel').offset().left;
+	        		var mousey = eventData.pageY - $('#secondLevel').offset().top;
+	        
+	        		if (mousex > 0 && mousex < canvas.width && mousey > 0 && mousey < canvas.height) {   
+		         		var row = Math.floor(mousey / length);
+		         		var col = Math.floor(mousex / length);
+		         		var checker = board.getCheckerAt(dragData.row, dragData.col);
+		         		var ramifications = rules.makeMove(checker, directionOf(whoseTurn) , directionOf(dragData.color), row, col);
+		        		if (ramifications!= null){ //attempt to make move
+		        				redoRamArray = new Array();
+		        				undoRamArray.push(ramifications);
+		        				$('#btnUndo').removeAttr('disabled');
+		        				$('#btnRedo').attr('disabled', 'disabled');
+		        				
+			        			toggleTurn();		        		
+			        			doCompPlayer();
+			        			
+			        		} else {
+			        			//addCheckerToBoard(dragData.row, dragData.col, dragData.isKing, dragData.color);
+			        			dragData.clickedChecker.css({left: dragData.oldX, top: dragData.oldY});
+		        		}
+	        		} else {//mouse is off board
+	        			dragData.clickedChecker.css({left: dragData.oldX, top: dragData.oldY});
+	        		}
+            	}
+        		dragData.setter = false;
+       	
+            });       
+         
+        }
+        });
+        });
+</script>
+
+</head>
+
+<body>
+
+<table id="mainTable">
+    <tr>
+        <td id="navigation">
+          <table>
+			  <tr><td class = "Turn">		<span id = "whoseTurn">  </span>	Turn	</td></tr>
+              <tr><td><input id="btnNewGame" type="button" name="new" value="New Game"/></td></tr>
+              <tr><td><input id="btnAutoMove" type="button" name="new" value="Auto Move"/></td></tr>
+              <tr><td><input id="btnUndo" type = "button" name = "new" value = "Undo"/> </td></tr>
+              <tr><td><input id="btnRedo" type = "button"  name = "new" value = "Redo"/> </td></tr>
+
+            </table>
+        </td>
+
+        <td id = "content">
+        <div id = 'firstLevel'> <canvas id= "board" width="400" height="400">  </canvas> </div>
+        <div id = 'secondLevel'> </div>
+        <div id = 'thirdLevel'> <canvas id= "arrows" width="400" height="400"></canvas>  </div>
+			
+        </td>
+    </tr>
+
+   </table>
+
+</body>
+
+</html>
